@@ -6,7 +6,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import java.time.Instant;
 import java.util.List;
 
-public class SlidingWindowRateLimiter {
+public class SlidingWindowRateLimiter implements RateLimiterAlgorithm {
 
     // Atomic Lua script: removes stale entries, counts current window, adds if under limit.
     // Uses a unique member per request (timestamp + nanoTime) so concurrent requests at
@@ -40,6 +40,7 @@ public class SlidingWindowRateLimiter {
         this.windowSeconds = windowSeconds;
     }
 
+    @Override
     public RateLimitResult check(String userId, String action) {
         String key = "rate_limit:" + userId + ":" + action;
         long nowMillis = Instant.now().toEpochMilli();
