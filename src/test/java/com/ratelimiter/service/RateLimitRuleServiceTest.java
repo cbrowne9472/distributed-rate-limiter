@@ -9,8 +9,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 @Import(TestcontainersConfiguration.class)
@@ -28,60 +26,58 @@ class RateLimitRuleServiceTest {
 
     @Test
     void freeTierGetsHundredRequestsPerMinuteByDefault() {
-        Optional<RateLimitRule> rule = ruleService.findRule("user1", UserTier.FREE, "api:get");
+        RateLimitRule rule = ruleService.findRule("user1", UserTier.FREE, "api:get");
 
-        assertTrue(rule.isPresent());
-        assertEquals(100, rule.get().getRequestLimit());
-        assertEquals(60,  rule.get().getWindowSeconds());
-        assertEquals("sliding_window", rule.get().getAlgorithmType());
+        assertNotNull(rule);
+        assertEquals(100, rule.getRequestLimit());
+        assertEquals(60,  rule.getWindowSeconds());
+        assertEquals("sliding_window", rule.getAlgorithmType());
     }
 
     @Test
     void proTierGetsThousandRequestsPerMinuteByDefault() {
-        Optional<RateLimitRule> rule = ruleService.findRule("user1", UserTier.PRO, "api:get");
+        RateLimitRule rule = ruleService.findRule("user1", UserTier.PRO, "api:get");
 
-        assertTrue(rule.isPresent());
-        assertEquals(1000, rule.get().getRequestLimit());
+        assertNotNull(rule);
+        assertEquals(1000, rule.getRequestLimit());
     }
 
     @Test
     void internalTierIsEffectivelyUnlimited() {
-        Optional<RateLimitRule> rule = ruleService.findRule("svc1", UserTier.INTERNAL, "api:batch");
+        RateLimitRule rule = ruleService.findRule("svc1", UserTier.INTERNAL, "api:batch");
 
-        assertTrue(rule.isPresent());
-        assertEquals(Integer.MAX_VALUE, rule.get().getRequestLimit());
+        assertNotNull(rule);
+        assertEquals(Integer.MAX_VALUE, rule.getRequestLimit());
     }
 
     @Test
     void actionSpecificRuleTakesPriorityOverTierWideDefault() {
-        // PRO users normally get 1000/min — add a tighter limit for expensive export action
         ruleService.save(new RateLimitRule(UserTier.PRO, "api:export", 10, 3600, "token_bucket"));
 
-        Optional<RateLimitRule> exportRule = ruleService.findRule("user1", UserTier.PRO, "api:export");
-        assertTrue(exportRule.isPresent());
-        assertEquals(10, exportRule.get().getRequestLimit());
-        assertEquals("token_bucket", exportRule.get().getAlgorithmType());
+        RateLimitRule exportRule = ruleService.findRule("user1", UserTier.PRO, "api:export");
+        assertNotNull(exportRule);
+        assertEquals(10, exportRule.getRequestLimit());
+        assertEquals("token_bucket", exportRule.getAlgorithmType());
 
-        // Other actions for the same PRO user still fall back to the tier-wide default
-        Optional<RateLimitRule> defaultRule = ruleService.findRule("user1", UserTier.PRO, "api:list");
-        assertTrue(defaultRule.isPresent());
-        assertEquals(1000, defaultRule.get().getRequestLimit());
+        // Other PRO actions still fall back to the tier-wide default
+        RateLimitRule defaultRule = ruleService.findRule("user1", UserTier.PRO, "api:list");
+        assertNotNull(defaultRule);
+        assertEquals(1000, defaultRule.getRequestLimit());
     }
 
     @Test
     void userSpecificRuleOverridesTierWideDefault() {
-        // Give a specific FREE user a custom higher limit
         RateLimitRule override = new RateLimitRule(UserTier.FREE, "api:get", 500, 60, "sliding_window");
         override.setUserId("vip-user");
         ruleService.save(override);
 
-        Optional<RateLimitRule> vipRule = ruleService.findRule("vip-user", UserTier.FREE, "api:get");
-        assertTrue(vipRule.isPresent());
-        assertEquals(500, vipRule.get().getRequestLimit());
+        RateLimitRule vipRule = ruleService.findRule("vip-user", UserTier.FREE, "api:get");
+        assertNotNull(vipRule);
+        assertEquals(500, vipRule.getRequestLimit());
 
         // A regular FREE user is unaffected
-        Optional<RateLimitRule> normalRule = ruleService.findRule("normal-user", UserTier.FREE, "api:get");
-        assertTrue(normalRule.isPresent());
-        assertEquals(100, normalRule.get().getRequestLimit());
+        RateLimitRule normalRule = ruleService.findRule("normal-user", UserTier.FREE, "api:get");
+        assertNotNull(normalRule);
+        assertEquals(100, normalRule.getRequestLimit());
     }
 }

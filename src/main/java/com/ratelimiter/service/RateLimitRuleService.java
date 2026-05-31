@@ -3,14 +3,18 @@ package com.ratelimiter.service;
 import com.ratelimiter.model.RateLimitRule;
 import com.ratelimiter.model.UserTier;
 import com.ratelimiter.repository.RateLimitRuleRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class RateLimitRuleService {
+
+    static final String CACHE_NAME = "rules";
 
     private final RateLimitRuleRepository repository;
 
@@ -19,33 +23,37 @@ public class RateLimitRuleService {
     }
 
     /**
-     * Finds the most specific rule for a user+tier+action combination.
+     * Returns the most specific rule for a user+tier+action combination, or null if none exists.
+     * Result is cached in Redis for 5 minutes (TTL set in CacheConfig).
      *
-     * Priority (highest to lowest):
-     *   1. User-specific + action-specific override
-     *   2. Tier-specific + action-specific rule
-     *   3. Tier-wide fallback (action = null)
+     * Priority:  user+action  >  tier+action  >  tier-wide
      */
-    public Optional<RateLimitRule> findRule(String userId, UserTier tier, String action) {
+    @Cacheable(value = CACHE_NAME, key = "#userId + ':' + #tier.name() + ':' + #action",
+               unless = "#result == null")
+    @Nullable
+    public RateLimitRule findRule(String userId, UserTier tier, String action) {
         if (userId != null && action != null) {
-            Optional<RateLimitRule> userRule = repository.findByUserIdAndAction(userId, action);
-            if (userRule.isPresent()) return userRule;
+            RateLimitRule userRule = repository.findByUserIdAndAction(userId, action).orElse(null);
+            if (userRule != null) return userRule;
         }
 
         if (action != null) {
-            Optional<RateLimitRule> tierActionRule = repository.findByTierAndActionAndUserIdIsNull(tier, action);
-            if (tierActionRule.isPresent()) return tierActionRule;
+            RateLimitRule tierActionRule =
+                    repository.findByTierAndActionAndUserIdIsNull(tier, action).orElse(null);
+            if (tierActionRule != null) return tierActionRule;
         }
 
-        return repository.findByTierAndUserIdIsNullAndActionIsNull(tier);
+        return repository.findByTierAndUserIdIsNullAndActionIsNull(tier).orElse(null);
     }
 
     @Transactional
+    @CacheEvict(value = CACHE_NAME, allEntries = true)
     public RateLimitRule save(RateLimitRule rule) {
         return repository.save(rule);
     }
 
     @Transactional
+    @CacheEvict(value = CACHE_NAME, allEntries = true)
     public void delete(Long id) {
         repository.deleteById(id);
     }

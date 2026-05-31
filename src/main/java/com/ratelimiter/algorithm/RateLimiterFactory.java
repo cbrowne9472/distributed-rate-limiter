@@ -1,7 +1,9 @@
 package com.ratelimiter.algorithm;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
 
+@Component
 public class RateLimiterFactory {
 
     private final StringRedisTemplate redis;
