@@ -3,8 +3,10 @@ package com.ratelimiter.service;
 import com.ratelimiter.algorithm.RateLimitResult;
 import com.ratelimiter.algorithm.RateLimiterAlgorithm;
 import com.ratelimiter.algorithm.RateLimiterFactory;
+import com.ratelimiter.dto.StatsResponse;
 import com.ratelimiter.model.RateLimitRule;
 import com.ratelimiter.model.UserTier;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -35,5 +37,22 @@ public class RateLimitCheckService {
                 factory.create(rule.getAlgorithmType(), rule.getRequestLimit(), rule.getWindowSeconds());
 
         return algorithm.check(userId, action);
+    }
+
+    /**
+     * Returns current usage stats for a user+tier+action without consuming a token.
+     * Returns null when no rule is configured for the combination.
+     */
+    @Nullable
+    public StatsResponse getStats(String userId, UserTier tier, String action) {
+        RateLimitRule rule = ruleService.findRule(userId, tier, action);
+        if (rule == null) return null;
+
+        RateLimiterAlgorithm algorithm =
+                factory.create(rule.getAlgorithmType(), rule.getRequestLimit(), rule.getWindowSeconds());
+
+        int remaining = algorithm.remaining(userId, action);
+        return new StatsResponse(userId, action, tier.name(), remaining,
+                rule.getRequestLimit(), rule.getWindowSeconds(), rule.getAlgorithmType());
     }
 }

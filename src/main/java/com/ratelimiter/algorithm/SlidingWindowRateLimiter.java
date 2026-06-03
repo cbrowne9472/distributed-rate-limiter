@@ -30,6 +30,18 @@ public class SlidingWindowRateLimiter implements RateLimiterAlgorithm {
 
     private static final DefaultRedisScript<List> SCRIPT = new DefaultRedisScript<>(LUA_SCRIPT, List.class);
 
+    // Peek: prune stale entries then return remaining slots — no ZADD, no state change.
+    private static final String PEEK_SCRIPT_TEXT = """
+            local key = KEYS[1]
+            local window_start = ARGV[1]
+            local limit = tonumber(ARGV[2])
+            redis.call('ZREMRANGEBYSCORE', key, '-inf', '(' .. window_start)
+            local count = redis.call('ZCARD', key)
+            return limit - count
+            """;
+
+    private static final DefaultRedisScript<Long> PEEK_SCRIPT = new DefaultRedisScript<>(PEEK_SCRIPT_TEXT, Long.class);
+
     private final StringRedisTemplate redis;
     private final int maxRequests;
     private final int windowSeconds;
@@ -62,5 +74,16 @@ public class SlidingWindowRateLimiter implements RateLimiterAlgorithm {
         long remaining = (result != null) ? result.get(1) : 0L;
 
         return new RateLimitResult(allowed, (int) remaining, maxRequests);
+    }
+
+    @Override
+    public int remaining(String userId, String action) {
+        String key = "rate_limit:" + userId + ":" + action;
+        long nowMillis = Instant.now().toEpochMilli();
+        long windowStartMillis = nowMillis - (windowSeconds * 1000L);
+
+        Long result = redis.execute(PEEK_SCRIPT, List.of(key),
+                String.valueOf(windowStartMillis), String.valueOf(maxRequests));
+        return result != null ? (int) Math.max(0, result) : maxRequests;
     }
 }
