@@ -8,38 +8,7 @@ Real companies (Stripe, AWS, Cloudflare) run this exact pattern internally. This
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                          Your Backend                           │
-│                                                                 │
-│   Incoming Request  →  POST /check  →  Allow / Deny (429)      │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-                    ┌───────────▼────────────┐
-                    │   Rate Limiter Service  │   Spring Boot 3.5
-                    │                        │
-                    │  1. Look up rule        │◄──── Redis cache (5 min TTL)
-                    │  2. Pick algorithm      │
-                    │  3. Atomic check        │◄──── Redis (sorted set / hash)
-                    │  4. Return result       │
-                    └────────────────────────┘
-                          │           │
-              ┌───────────┘           └───────────┐
-              ▼                                   ▼
-   ┌──────────────────┐                ┌──────────────────┐
-   │  PostgreSQL 16   │                │    Redis 7        │
-   │                  │                │                   │
-   │  Rate limit rules│                │  Sliding window:  │
-   │  (tier + limits) │                │  sorted set of    │
-   │  FREE:  100/min  │                │  timestamps       │
-   │  PRO:  1000/min  │                │                   │
-   │  INTERNAL: ∞     │                │  Token bucket:    │
-   └──────────────────┘                │  hash{tokens,     │
-                                       │  last_refill}     │
-                                       └──────────────────┘
-```
-
-See `architecture.drawio` for the full AWS deployment diagram (open with [diagrams.net](https://app.diagrams.net)).
+<img width="891" height="641" alt="image" src="https://github.com/user-attachments/assets/0fcec093-02fe-408d-b97c-9dfc341fb6ca" />
 
 ---
 
