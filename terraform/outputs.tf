@@ -18,6 +18,11 @@ output "redis_endpoint" {
   value       = aws_elasticache_cluster.redis.cache_nodes[0].address
 }
 
+output "alarm_topic_arn" {
+  description = "Subscribe your email: aws sns subscribe --topic-arn <arn> --protocol email --notification-endpoint you@email.com"
+  value       = aws_sns_topic.alarms.arn
+}
+
 output "service_url" {
   description = "ECS task public IP — look up the running task in the console for the exact IP"
   value       = "Check ECS → Clusters → ${aws_ecs_cluster.main.name} → Tasks → public IP :8080"

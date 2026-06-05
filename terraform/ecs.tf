@@ -63,6 +63,14 @@ resource "aws_ecs_task_definition" "app" {
         name  = "SPRING_JPA_HIBERNATE_DDL_AUTO"
         value = "none"
       },
+      {
+        name  = "MANAGEMENT_CLOUDWATCH_METRICS_EXPORT_ENABLED"
+        value = "true"
+      },
+      {
+        name  = "MANAGEMENT_CLOUDWATCH_METRICS_EXPORT_NAMESPACE"
+        value = "RateLimiter"
+      },
     ]
 
     logConfiguration = {
